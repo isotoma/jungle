@@ -11,21 +11,28 @@ from distutils.version import StrictVersion
 
 jungle.stderr = mock.MagicMock()
 
-class multipatch(dict):
+class multipatch:
     
     """ Mock a bunch of functions at once """
     
     def __init__(self, *items):
+        self.mgr = {}
         self.items = items
     
     def __enter__(self):
         for i in self.items:
-            self[i] = mock.patch(i).__enter__()
+            self.mgr[i] = mock.patch(i).__enter__()
         return self
     
     def __exit__(self, *args):
-        for m in self.values():
+        for m in self.mgr.values():
             m.__exit__(*args)
+            
+    def __getitem__(self, k):
+        if k not in self.mgr:
+            self.mgr[k] = mock.patch(k).__enter__()
+        return self.mgr[k]
+            
         
 
 class CommandParseTest(TestCase):
@@ -100,7 +107,7 @@ class JungleTest(TestCase):
             return {
                 '/var/tmp/current': False,
             }.get(v, True)
-        with multipatch('os.listdir', 'os.path.exists', 'os.symlink', 'os.path.isdir') as m:
+        with multipatch('os.symlink') as m:
             m['os.listdir'].return_value = ['1.0']
             m['os.path.exists'].side_effect = exists
             m['os.path.isdir'].return_value = True
