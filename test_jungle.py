@@ -105,7 +105,7 @@ class JungleTest(TestCase):
             m['os.path.exists'].side_effect = exists
             m['os.path.isdir'].return_value = True
             j.initialise()
-            self.assertEqual(m['os.symlink'].call_args, (('1.0', '/var/tmp/current'), {}))
+            m['os.symlink'].assert_called_with('1.0', '/var/tmp/current')
                 
                 
 
