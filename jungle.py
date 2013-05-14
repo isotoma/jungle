@@ -41,7 +41,7 @@ class Jungle(object):
             except ValueError:
                 pass
             
-    def get_head(self):
+    def head(self):
         return max(self.versions())
     
     def path(self, path):
@@ -50,7 +50,7 @@ class Jungle(object):
     def initialise(self):
         """ Set up the appropriate current pointer """
         try:
-            head = self.get_head()
+            head = self.head()
         except ValueError:
             print >>stderr, "No versions in directory %r, cannot initialise" % self.parent
             raise SystemExit(-1)

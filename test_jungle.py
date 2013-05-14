@@ -42,6 +42,20 @@ class JungleTest(TestCase):
                              [StrictVersion('1.0'),
                              StrictVersion('1.3b1'),
                              StrictVersion('2.0')])
+            mock_listdir.return_value = ['bin']
+            self.assertEqual(list(j.versions()),
+                             [])
+            mock_listdir.return_value = []
+            self.assertEqual(list(j.versions()),
+                             [])
+    
+    def test_head(self):
+        j = Jungle("/var/tmp")
+        with mock.patch('os.listdir') as mock_listdir:
+            mock_listdir.return_value = ['1.0', '2.0', 'bin', '1.3b1']
+            self.assertEqual(j.head(), "2.0")
+            mock_listdir.return_value = ['bin']
+            self.assertRaises(ValueError, j.head)
                           
         
 if __name__ == '__main__':
