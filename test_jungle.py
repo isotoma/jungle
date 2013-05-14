@@ -120,13 +120,14 @@ class JungleTest(TestCase):
         return exists
             
     def test_initialise(self):
-        with multipatch('os.symlink') as m:
+        with multipatch('os.symlink', 'os.rename') as m:
             m['os.listdir'].return_value = ['1.0']
             m['os.path.exists'].side_effect = self._exists("/t/current")
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
             j.initialise()
-            m['os.symlink'].assert_called_with('1.0', '/t/current')
+            m['os.symlink'].assert_called_with('1.0', '/t/current.new')
+            m['os.rename'].assert_called_with("/t/current.new", "/t/current")
                 
         
 if __name__ == '__main__':

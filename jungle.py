@@ -72,9 +72,9 @@ class Jungle(object):
             version = StrictVersion(version)
         if not self.exists(version):
             raise KeyError("Version %s does not exist" % version)
-        if os.path.exists(self.path("current")):
-            os.unlink(self.path("current"))
-        os.symlink(str(version), self.path("current"))
+        os.symlink(str(version), self.path("current.new"))
+        os.rename(self.path("current.new"), self.path("current"))
+        
 
 
 class Cmd:
