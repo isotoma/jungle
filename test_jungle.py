@@ -16,22 +16,28 @@ class multipatch:
     """ Mock a bunch of functions at once """
     
     def __init__(self, *items):
-        self.mgr = {}
+        self.mocks = {}
+        self.managers = []
         self.items = items
     
     def __enter__(self):
         for i in self.items:
-            self.mgr[i] = mock.patch(i).__enter__()
+            self.patch(i)
         return self
     
+    def patch(self, term):
+        m = mock.patch(term)
+        self.managers.append(m)
+        self.mocks[term] = m.__enter__()
+        
     def __exit__(self, *args):
-        for m in self.mgr.values():
+        for m in self.managers:
             m.__exit__(*args)
             
     def __getitem__(self, k):
-        if k not in self.mgr:
-            self.mgr[k] = mock.patch(k).__enter__()
-        return self.mgr[k]
+        if k not in self.mocks:
+            self.patch(k)
+        return self.mocks[k]
 
 class CommandParseTest(TestCase):
     
@@ -63,50 +69,60 @@ class JungleTest(TestCase):
         self.assertRaises(OSError, Jungle, "/etc/hosts")
     
     def test_versions(self):
-        j = Jungle("/var/tmp")
-        with mock.patch('os.listdir') as mock_listdir:
-            mock_listdir.return_value = ['1.0', '2.0', 'bin', '1.3b1']
+        ldrv = [['1.0', '2.0', 'bin', '1.3b1'],
+                ['bin'],
+                []]
+        with multipatch() as m:
+            m['os.listdir'].side_effect = lambda x: ldrv.pop(0)
+            m['os.path.exists'].return_value = True
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
+            # with versions
             self.assertEqual(list(j.versions()),
                              [StrictVersion('1.0'),
                              StrictVersion('1.3b1'),
                              StrictVersion('2.0')])
-            mock_listdir.return_value = ['bin']
-            self.assertEqual(list(j.versions()),
-                             [])
-            mock_listdir.return_value = []
-            self.assertEqual(list(j.versions()),
-                             [])
+            # just bin
+            self.assertEqual(list(j.versions()), [])
+            # empty
+            self.assertEqual(list(j.versions()), [])
     
     def test_head(self):
-        j = Jungle("/var/tmp")
-        with mock.patch('os.listdir') as mock_listdir:
-            mock_listdir.return_value = ['1.0', '2.0', 'bin', '1.3b1']
+        ldrv = [['1.0', '2.0', 'bin', '1.3b1'],
+                ['bin']]
+        with multipatch() as m:
+            m['os.listdir'].side_effect = lambda x: ldrv.pop(0)
+            m['os.path.exists'].return_value = True
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
             self.assertEqual(j.head(), "2.0")
-            mock_listdir.return_value = ['bin']
             self.assertRaises(ValueError, j.head)
             
     def test_initialise_no_versions(self):
-        j = Jungle("/var/tmp")
-        with mock.patch('os.listdir') as mock_listdir:
-            mock_listdir.return_value = ['bin']
+        with multipatch() as m:
+            m['os.listdir'].return_value = ['bin']
+            m['os.path.exists'].return_value = True
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
             self.assertRaises(SystemExit, j.initialise)
 
     def test_initialise_with_current(self):
-        j = Jungle("/var/tmp")
-        with mock.patch('os.listdir') as mock_listdir:
-            mock_listdir.return_value = ['1.0']
-            with mock.patch('os.path.exists') as mock_exists:
-                mock_exists.return_value = True
-                self.assertRaises(SystemExit, j.initialise)
+        with multipatch() as m:
+            m['os.listdir'].return_value = ['1.0']
+            m['os.path.exists'].return_value = True
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
+            self.assertRaises(SystemExit, j.initialise)
+
+    def _exists(self, *missing):
+        def exists(v):
+            return not v in missing
+        return exists
             
     def test_initialise(self):
-        def exists(v):
-            return {
-                '/t/current': False,
-            }.get(v, True)
         with multipatch('os.symlink') as m:
             m['os.listdir'].return_value = ['1.0']
-            m['os.path.exists'].side_effect = exists
+            m['os.path.exists'].side_effect = self._exists("/t/current")
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
             j.initialise()
