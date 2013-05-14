@@ -160,7 +160,18 @@ class JungleTest(TestCase):
             j = Jungle("/t")
             j.delete("2.0")
             m['shutil.rmtree'].asset_called_with('/t/2.0')
-        
+
+    def test_rollback(self):
+        with multipatch('os.symlink', 'os.rename') as m:
+            m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3']
+            m['os.path.exists'].return_value = True
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
+            rv = j.rollback()
+            self.assertEqual(rv, '1.0')
+            m['os.symlink'].assert_called_with('1.0', '/t/current.new')
+            m['os.rename'].assert_called_with("/t/current.new", "/t/current")
+            
         
 if __name__ == '__main__':
     main()

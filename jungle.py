@@ -99,8 +99,15 @@ class Jungle(object):
         self.set(self.head())
         
     def rollback(self, dry_run=False):
-        """ Set current to head - 1 and prints the version chosen. If dry-run
-        is True then just prints the version chosen. """
+        """ Set current to head - 1 and returns the version chosen. If dry-run
+        is True then just returns the version chosen. """
+        v = list(self.versions())
+        if len(v) < 2:
+            raise ValueError("Not enough versions to rollback")
+        previous = sorted(v)[-2]
+        if not dry_run:
+            self.set(previous)
+        return str(previous)
         
     def current(self):
         """ Return the latest version """
