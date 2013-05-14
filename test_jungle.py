@@ -1,4 +1,6 @@
 
+import wingdbstub
+
 from unittest import TestCase, main
 import mock
 
@@ -8,6 +10,23 @@ from jungle import Jungle, cmd, parse_command
 from distutils.version import StrictVersion
 
 jungle.stderr = mock.MagicMock()
+
+class multipatch(dict):
+    
+    """ Mock a bunch of functions at once """
+    
+    def __init__(self, *items):
+        self.items = items
+    
+    def __enter__(self):
+        for i in self.items:
+            self[i] = mock.patch(i).__enter__()
+        return self
+    
+    def __exit__(self, *args):
+        for m in self.values():
+            m.__exit__(*args)
+        
 
 class CommandParseTest(TestCase):
     
@@ -33,6 +52,10 @@ class CommandParseTest(TestCase):
         self.assertEqual(parse_command(['init', '/foo']), (cmd.do_init, {}, ['/foo']))
         
 class JungleTest(TestCase):
+    
+    def test_init(self):
+        self.assertRaises(OSError, Jungle, "/foo")
+        self.assertRaises(OSError, Jungle, "/etc/hosts")
     
     def test_versions(self):
         j = Jungle("/var/tmp")
@@ -73,14 +96,16 @@ class JungleTest(TestCase):
             
     def test_initialise(self):
         j = Jungle("/var/tmp")
-        with mock.patch('os.listdir') as mock_listdir:
-            mock_listdir.return_value = ['1.0']
-            with mock.patch('os.path.exists') as mock_exists:
-                mock_exists.return_value = False
-                with mock.patch('os.symlink') as mock_symlink:
-                    j.initialise()
-                    self.assertEqual(mock_symlink.called, True)
-                    self.assertEqual(mock_symlink.call_args, (('1.0', '/var/tmp/current'), {}))
+        def exists(v):
+            return {
+                '/var/tmp/current': False,
+            }.get(v, True)
+        with multipatch('os.listdir', 'os.path.exists', 'os.symlink', 'os.path.isdir') as m:
+            m['os.listdir'].return_value = ['1.0']
+            m['os.path.exists'].side_effect = exists
+            m['os.path.isdir'].return_value = True
+            j.initialise()
+            self.assertEqual(m['os.symlink'].call_args, (('1.0', '/var/tmp/current'), {}))
                 
                 
 

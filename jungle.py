@@ -30,6 +30,10 @@ stderr = sys.stderr
 class Jungle(object):
     
     def __init__(self, parent):
+        if not os.path.exists(parent):
+            raise OSError("No such directory: %r" % parent)
+        if not os.path.isdir(parent):
+            raise OSError("Is not a directory: %r" % parent)
         self.parent = parent # top level directory containing the jungle
         
     def versions(self):
@@ -38,8 +42,12 @@ class Jungle(object):
         for item in sorted(os.listdir(self.parent)):
             try:
                 yield StrictVersion(item)
-            except ValueError:
+            except ValueError, e:
                 pass
+            
+    def exists(self, version):
+        p = self.path(str(version))
+        return os.path.isdir(p)
             
     def head(self):
         return max(self.versions())
@@ -57,7 +65,17 @@ class Jungle(object):
         if os.path.exists(self.path("current")):
             print >>stderr, "Current already exists in %r, will not initialise existing jungle" % self.parent
             raise SystemExit(-1)
-        os.symlink(str(self.head()), self.path("current"))
+        self.set(self.head())
+        
+    def set(self, version):
+        if not isinstance(version, StrictVersion):
+            version = StrictVersion(version)
+        if not self.exists(version):
+            raise KeyError("Version %s does not exist" % version)
+        if os.path.exists(self.path("current")):
+            os.unlink(self.path("current"))
+        os.symlink(str(version), self.path("current"))
+
 
 class Cmd:
     
