@@ -56,6 +56,35 @@ class JungleTest(TestCase):
             self.assertEqual(j.head(), "2.0")
             mock_listdir.return_value = ['bin']
             self.assertRaises(ValueError, j.head)
+            
+    def test_initialise_no_versions(self):
+        j = Jungle("/var/tmp")
+        with mock.patch('os.listdir') as mock_listdir:
+            mock_listdir.return_value = ['bin']
+            self.assertRaises(SystemExit, j.initialise)
+
+    def test_initialise_with_current(self):
+        j = Jungle("/var/tmp")
+        with mock.patch('os.listdir') as mock_listdir:
+            mock_listdir.return_value = ['1.0']
+            with mock.patch('os.path.exists') as mock_exists:
+                mock_exists.return_value = True
+                self.assertRaises(SystemExit, j.initialise)
+            
+    def test_initialise(self):
+        j = Jungle("/var/tmp")
+        with mock.patch('os.listdir') as mock_listdir:
+            mock_listdir.return_value = ['1.0']
+            with mock.patch('os.path.exists') as mock_exists:
+                mock_exists.return_value = False
+                with mock.patch('os.symlink') as mock_symlink:
+                    j.initialise()
+                    self.assertEqual(mock_symlink.called, True)
+                    self.assertEqual(mock_symlink.call_args, (('1.0', '/var/tmp/current'), {}))
+                
+                
+
+            
                           
         
 if __name__ == '__main__':

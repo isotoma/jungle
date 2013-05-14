@@ -43,7 +43,7 @@ class Jungle(object):
             
     def head(self):
         return max(self.versions())
-    
+     
     def path(self, path):
         return os.path.join(self.parent, path)
                 
@@ -57,6 +57,7 @@ class Jungle(object):
         if os.path.exists(self.path("current")):
             print >>stderr, "Current already exists in %r, will not initialise existing jungle" % self.parent
             raise SystemExit(-1)
+        os.symlink(str(self.head()), self.path("current"))
 
 class Cmd:
     
