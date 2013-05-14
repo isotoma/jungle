@@ -152,6 +152,15 @@ class JungleTest(TestCase):
             j.set('2.0')
             m['os.symlink'].assert_called_with('2.0', '/t/current.new')
             m['os.rename'].assert_called_with("/t/current.new", "/t/current")
+            
+    def test_delete(self):
+        with multipatch('shutil.rmtree') as m:
+            m['os.path.exists'].return_value = True
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
+            j.delete("2.0")
+            m['shutil.rmtree'].asset_called_with('/t/2.0')
+        
         
 if __name__ == '__main__':
     main()

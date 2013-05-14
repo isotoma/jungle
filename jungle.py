@@ -16,6 +16,7 @@ only accept the version numbers that module supports.
 import os
 import sys
 import optparse
+import shutil
 
 from distutils.version import StrictVersion
 
@@ -53,6 +54,8 @@ class Jungle(object):
         return max(self.versions())
      
     def path(self, path):
+        if isinstance(path, StrictVersion):
+            path = str(path)
         return os.path.join(self.parent, path)
                 
     def initialise(self):
@@ -83,6 +86,13 @@ class Jungle(object):
     def delete(self, version):
         """ Delete the specified version. Raises an error if the specified
         version is current. """
+        if not isinstance(version, StrictVersion):
+            version = StrictVersion(version)
+        if not self.exists(version):
+            raise KeyError("Version %s does not exist" % version)
+        if not os.path.exists(self.path("current")):
+            raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+        shutil.rmtree(self.path(version))
 
     def latest(self):
         """ Set current to head """
