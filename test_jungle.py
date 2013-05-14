@@ -32,8 +32,6 @@ class multipatch:
         if k not in self.mgr:
             self.mgr[k] = mock.patch(k).__enter__()
         return self.mgr[k]
-            
-        
 
 class CommandParseTest(TestCase):
     
@@ -102,22 +100,18 @@ class JungleTest(TestCase):
                 self.assertRaises(SystemExit, j.initialise)
             
     def test_initialise(self):
-        j = Jungle("/var/tmp")
         def exists(v):
             return {
-                '/var/tmp/current': False,
+                '/t/current': False,
             }.get(v, True)
         with multipatch('os.symlink') as m:
             m['os.listdir'].return_value = ['1.0']
             m['os.path.exists'].side_effect = exists
             m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
             j.initialise()
-            m['os.symlink'].assert_called_with('1.0', '/var/tmp/current')
+            m['os.symlink'].assert_called_with('1.0', '/t/current')
                 
-                
-
-            
-                          
         
 if __name__ == '__main__':
     main()
