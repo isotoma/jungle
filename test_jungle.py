@@ -136,8 +136,22 @@ class JungleTest(TestCase):
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
             self.assertRaises(OSError, j.set, '1.0')
-        
-                
+
+    def test_set(self):        
+        with multipatch('os.symlink', 'os.rename') as m:
+            m['os.listdir'].return_value = ['1.0']
+            m['os.path.exists'].side_effect = self._exists("/t/current")
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
+            j.initialise()
+            m['os.symlink'].assert_called_with('1.0', '/t/current.new')
+            m['os.rename'].assert_called_with("/t/current.new", "/t/current")
+            # now set it to 2.0
+            m['os.listdir'].return_value = ['1.0', '2.0']
+            m['os.path.exists'].side_effect = self._exists()
+            j.set('2.0')
+            m['os.symlink'].assert_called_with('2.0', '/t/current.new')
+            m['os.rename'].assert_called_with("/t/current.new", "/t/current")
         
 if __name__ == '__main__':
     main()
