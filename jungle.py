@@ -35,7 +35,7 @@ class Jungle(object):
     def versions(self):
         """ Return StrictVersion objects for every possible version. If
         something is not a valid version number we ignore it. """
-        for item in os.listdir(self.parent):
+        for item in sorted(os.listdir(self.parent)):
             try:
                 yield StrictVersion(item)
             except ValueError:
@@ -87,7 +87,7 @@ def parse_command(args):
 
     global verbose
     if len(args) == 0:
-        return cmd.do_help, [], []
+        return cmd.do_help, {}, []
     while args and args[0].startswith("-"):
         if args[0] == '-v':
             verbose = True
@@ -96,7 +96,7 @@ def parse_command(args):
             print >>stderr, "Unrecognised argument: %s" % args[0]
             raise SystemExit(-1)
     if len(args) == 0:
-        return cmd.do_help, [], []
+        return cmd.do_help, {}, []
     command = args[0]
     func = getattr(cmd, "do_" + command, None)
     if func is None:
