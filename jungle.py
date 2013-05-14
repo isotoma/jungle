@@ -65,17 +65,52 @@ class Jungle(object):
         if os.path.exists(self.path("current")):
             print >>stderr, "Current already exists in %r, will not initialise existing jungle" % self.parent
             raise SystemExit(-1)
-        self.set(self.head())
+        self._set(self.head())
         
-    def set(self, version):
-        if not isinstance(version, StrictVersion):
-            version = StrictVersion(version)
+    def _set(self, version):
         if not self.exists(version):
             raise KeyError("Version %s does not exist" % version)
         os.symlink(str(version), self.path("current.new"))
         os.rename(self.path("current.new"), self.path("current"))
         
+    def set(self, version):
+        if not isinstance(version, StrictVersion):
+            version = StrictVersion(version)
+        if not os.path.exists(self.path("current")):
+            raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+        self._set(version)
 
+    def delete(self, version):
+        """ Delete the specified version. Raises an error if the specified
+        version is current. """
+
+    def latest(self):
+        """ Set current to head """
+        self.set(self.head())
+        
+    def rollback(self, dry_run=False):
+        """ Set current to head - 1 and prints the version chosen. If dry-run
+        is True then just prints the version chosen. """
+        
+    def current(self):
+        """ Return the latest version """
+        
+    def status(self):
+        """ Prints "current" or "degraded" depending on state """
+        
+    def prune_age(self, age):
+        """ Delete versions older than age days. Will not delete the current
+        version. """
+    
+    def prune_iterations(self, n):
+        """ Delete the oldest n versions. Will not delete the current
+        version. """
+    
+    def prune_size(self, size):
+        """ Delete old versions until the total size of the parent is less
+        than the specified size in Kilobytes. Will not delete the current
+        version. """
+        
 
 class Cmd:
     
