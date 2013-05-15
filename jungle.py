@@ -123,12 +123,6 @@ class Jungle(object):
         """ Delete the oldest n versions. Will not delete the current
         version. """
     
-    def prune_size(self, size):
-        """ Delete old versions until the total size of the parent is less
-        than the specified size in Kilobytes. Will not delete the current
-        version. """
-        
-
 class Cmd:
     
     def do_init(self, opts, args):
@@ -145,6 +139,27 @@ class Cmd:
         print "Initialising jungle in", tld
         j = Jungle(tld)
         j.initialise()
+        
+    def do_set(self, opts, args):
+        pass
+
+    def do_upgrade(self, opts, args):
+        pass
+    
+    def do_degrade(self, opts, args):
+        pass
+    
+    def do_current(self, opts, args):
+        pass
+    
+    def do_status(self, opts, args):
+        pass
+    
+    def do_prune(self, opts, args):
+        pass
+    
+    def do_delete(self, opts, args):
+        pass
     
     def do_help(self, opts, args):
         print "Help!"

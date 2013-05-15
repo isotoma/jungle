@@ -172,7 +172,6 @@ class JungleTest(TestCase):
             m['os.symlink'].assert_called_with('1.0', '/t/current.new')
             m['os.rename'].assert_called_with("/t/current.new", "/t/current")
             
-        
 if __name__ == '__main__':
     main()
                          
