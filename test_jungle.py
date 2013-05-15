@@ -403,13 +403,7 @@ class JungleSystemTest(TestCase):
         self.assert_(not os.path.exists("j/release/2.0"))
         self.assert_(os.path.exists("j/release/3.0"))
         self.assert_(os.path.exists("j/release/4.0"))
-        
-    
-    
-        
 
-    
-    
 if __name__ == '__main__':
     main()
                          
