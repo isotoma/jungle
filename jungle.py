@@ -155,16 +155,21 @@ class Jungle(object):
         ftime = os.stat(self.path(version))[stat.ST_MTIME]
         now = time.time()
         age = now-ftime
-        return age/(60*60*24)
+        days = int(age/(60*60*24.0))
+        return days
         
     def prune_age(self, age):
         """ Delete versions older than age days. Will not delete the current
         version. """
         self.check_current()
         for v in self.versions():
-            days = self.age(v)
-            if days > age:
-                self.delete(v)
+            if v == self.current():
+                if verbose:
+                    print "Skipping current"
+            else:
+                days = self.age(v)
+                if days > age:
+                    self.delete(v)
     
     def prune_iterations(self, n):
         """ Maintain a maximum of n versions. Will remove old versions until

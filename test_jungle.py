@@ -232,6 +232,46 @@ class JungleTest(TestCase):
             self.assertEqual(j.age("foo"), 1)
             m['os.stat'].return_value = fake_stat(9*24*3600+1800)
             self.assertEqual(j.age("foo"), 0)
+    
+    def test_prune_age(self):
+        ages = {
+            '/t/1.0': 10,
+            '/t/1.0b3': 9,
+            '/t/1.2': 5,
+            '/t/2.0': 3
+        }
+        def fake_stat(pathname):
+            l = [None]*9
+            l[8] = (10 - ages[pathname])*24*3600
+            return l
+        
+        def setup():
+            self._pass_current_checks(m)
+            m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3', '1.2']
+            m['time.time'].return_value = 10*24*3600
+            m['os.stat'].side_effect = fake_stat
+            m['os.readlink'].return_value = '2.0'
+            
+        with multipatch('shutil.rmtree') as m:
+            setup()
+            j = Jungle("/t")
+            j.prune_age(9)
+            m['shutil.rmtree'].assert_called_with('/t/1.0')
+
+        with multipatch('shutil.rmtree') as m:
+            setup()
+            j = Jungle("/t")
+            j.prune_age(5)
+            m['shutil.rmtree'].assert_any_call_with('/t/1.0b3')
+            m['shutil.rmtree'].assert_any_call_with('/t/1.0')
+
+        with multipatch('shutil.rmtree') as m:
+            setup()
+            j = Jungle("/t")
+            j.prune_age(0)
+            m['shutil.rmtree'].assert_any_call_with('/t/1.0b3')
+            m['shutil.rmtree'].assert_any_call_with('/t/1.0')
+            m['shutil.rmtree'].assert_any_call_with('/t/1.2')
         
             
             
