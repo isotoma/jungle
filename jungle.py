@@ -102,6 +102,8 @@ class Jungle(object):
             raise KeyError("Version %s does not exist" % version)
         if not os.path.exists(self.current):
             raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+        if version == self.current_version():
+            raise OSError("Will not delete current version")
         if verbose:
             print >>sys.stderr, "Deleting version %s" % (version,)
         shutil.rmtree(self.path(version))
@@ -210,12 +212,6 @@ class Cmd:
                 raise SystemExit(-1)
         return parent, remaining
             
-    def do_init(self, opts, args):
-        parent, _ = self._parent(args)
-        print "Initialising jungle in", parent
-        j = Jungle(parent)
-        j.initialise()
-        
     def help_init(self):
         print
         print "Initialise a new jungle. This will return an error if run on an existing"
@@ -223,18 +219,48 @@ class Cmd:
         print
         print "Usage:"
         print
-        print "    jungle init [<pathname>]"
+        print "    jungle init [pathname]"
+        
+    def do_init(self, opts, args):
+        parent, _ = self._parent(args)
+        print "Initialising jungle in", parent
+        j = Jungle(parent)
+        j.initialise()
+        
+    def help_set(self):
+        print 
+        print "Set the specified version as the current version"
+        print
+        print "Usage:"
+        print
+        print "    jungle set [pathname] <version>"
         
     def do_set(self, opts, args):
         parent, r = self._parent(args, argc=2)
         j = Jungle(parent)
         version = r[0]
         j.set(version)
+        
+    def help_upgrade(self):
+        print
+        print "Set the current to the most recent version present (Head)"
+        print 
+        print "Usage:"
+        print
+        print "    jungle upgrade [pathname]"
 
     def do_upgrade(self, opts, args):
         parent, _ = self._parent(args)
         j = Jungle(parent)
         j.upgrade()
+        
+    def help_degrade(self):
+        print
+        print "Set the current to the second from most recent version present (Head-1) and print the version chosen."
+        print
+        print "Usage:"
+        print
+        print "    jungle degrade [--dry-run] [pathname]"
 
     def opts_degrade(self, p):
         p.add_option("--dry-run", default=False, action="store_true", help="don't make any changes")
@@ -243,16 +269,42 @@ class Cmd:
         parent, _ = self._parent(args)
         j = Jungle(parent)
         j.degrade(dry_run=opts.dry_run)
+        
+    def help_current(self):
+        print
+        print "Print the current version"
+        print
+        print "Usage:"
+        print
+        print "    jungle current [pathname]"
     
     def do_current(self, opts, args):
         parent, _ = self._parent(args)
         j = Jungle(parent)
         print j.current_version()
+        
+    def help_status(self):
+        print
+        print "Print 'current' if current is at head or 'degraded' otherwise"
+        print
+        print "Usage:"
+        print
+        print "    jungle status [pathname]"
     
     def do_status(self, opts, args):
         parent, _ = self._parent(args)
         j = Jungle(parent)
         print j.status()
+        
+    def help_prune(self):
+        print
+        print "Delete old items from the symlink farm. ensure we don't delete what is"
+        print "pointed to by current. It has 2 options, by age or by the number of iterations"
+        print "(i.e. versions) to keep"
+        print
+        print "Usage:"
+        print
+        print "    jungle prune [--age N] [--iterations N] [pathname]"
         
     def opts_prune(self, p):
         p.add_option("--age", default=None, action="store", type="int", help="age in days to preserve")
@@ -268,6 +320,14 @@ class Cmd:
             j.prune_age(opts.age)
         if opts.iterations is not None:
             j.prune_iterations(opts.iterations)
+            
+    def help_delete(self):
+        print
+        print "Delete the specified version. Will not delete the current version even if you ask it to."
+        print
+        print "Usage:"
+        print
+        print "    jungle delete <version>"
     
     def do_delete(self, opts, args):
         parent, r = self._parent(args, argc=2)

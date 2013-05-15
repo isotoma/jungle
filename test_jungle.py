@@ -181,6 +181,12 @@ class JungleTest(TestCase):
             j = Jungle("/t")
             j.delete("2.0")
             m['shutil.rmtree'].asset_called_with('/t/release/2.0')
+    
+    def test_delete_current(self):
+        with multipatch('shutil.rmtree') as m:
+            self._pass_current_checks(m)
+            j = Jungle("/t")
+            self.assertRaises(OSError, j.delete, "1.0")
 
     def test_degrade(self):
         with multipatch('os.symlink', 'os.rename') as m:
