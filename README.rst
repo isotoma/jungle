@@ -84,7 +84,7 @@ numbers are equal, then one with a pre-release tag will always
 be deemed earlier (lesser) than one without.
 
 The following are valid version numbers (shown in the order that
-would be obtained by sorting according to the supplied cmp function):
+would be obtained by sorting according to the supplied cmp function)::
 
     0.4       0.4.0  (these two are equivalent)
     0.4.1
@@ -97,7 +97,7 @@ would be obtained by sorting according to the supplied cmp function):
     1.0.4b1
     1.0.4
 
-The following are examples of invalid version numbers:
+The following are examples of invalid version numbers::
 
     1
     2.7.2.2
@@ -146,7 +146,7 @@ degrade
 
 Set the current to the second from most recent version present (Head-1) and print the version chosen.::
 
-    jungle rollback [--dry-run] [<pathname>]
+    jungle degrade [--dry-run] [<pathname>]
 
 If the `dry-run` option is used then the degrade is not performed, but the
 version that would be used is still printed.
@@ -154,7 +154,7 @@ version that would be used is still printed.
 current
 -------
 
-Print the current version.
+Print the current version::
 
     jungle current [<pathname>]
 
@@ -172,7 +172,7 @@ Delete old items from the symlink farm. ensure we don't delete what is
 pointed to by current. It has 2 options, by age or by the number of iterations
 (i.e. versions) to keep::
 
-    jungle prune [--age N days] [--iterations 3] [<pathname>]
+    jungle prune [--age N days] [--iterations N] [<pathname>]
 
 delete
 ------

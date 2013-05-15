@@ -57,6 +57,7 @@ class CommandParseTest(TestCase):
         self.assertEqual(jungle.verbose, False)
         parse_command(['-v'])
         self.assertEqual(jungle.verbose, True)
+        jungle.verbose = False
         
     def test_init(self):
         self.assertEqual(parse_command(['init']), (cmd.do_init, {}, []))
@@ -86,6 +87,16 @@ class JungleTest(TestCase):
             self.assertEqual(list(j.versions()), [])
             # empty
             self.assertEqual(list(j.versions()), [])
+            
+    def test_oldest(self):
+        with multipatch() as m:
+            m['os.listdir'].return_value = ['1.0', '2.0', '1.3b1']
+            m['os.path.exists'].return_value = True
+            m['os.path.isdir'].return_value = True
+            j = Jungle("/t")
+            self.assertEqual(j.oldest(), '1.0')
+            
+        
     
     def test_head(self):
         ldrv = [['1.0', '2.0', 'bin', '1.3b1'],
@@ -137,11 +148,24 @@ class JungleTest(TestCase):
             j = Jungle("/t")
             self.assertRaises(OSError, j.set, '1.0')
 
+    def _pass_current_checks(self, m):
+        """ Set up the patches needed to pass the checks on current """
+        m['os.path.exists'].return_value = True
+        m['os.path.islink'].return_value = True
+        m['os.path.isdir'].return_value = True
+        m['os.readlink'].return_value = '1.0'
+        
+    def test_check_current(self):
+        with multipatch() as m:
+            self._pass_current_checks(m)
+            j = Jungle("/t")
+            j.check_current()
+        
     def test_set(self):        
         with multipatch('os.symlink', 'os.rename') as m:
+            self._pass_current_checks(m)
             m['os.listdir'].return_value = ['1.0']
             m['os.path.exists'].side_effect = self._exists("/t/current")
-            m['os.path.isdir'].return_value = True
             j = Jungle("/t")
             j.initialise()
             m['os.symlink'].assert_called_with('1.0', '/t/current.new')
@@ -155,19 +179,17 @@ class JungleTest(TestCase):
             
     def test_delete(self):
         with multipatch('shutil.rmtree') as m:
-            m['os.path.exists'].return_value = True
-            m['os.path.isdir'].return_value = True
+            self._pass_current_checks(m)
             j = Jungle("/t")
             j.delete("2.0")
             m['shutil.rmtree'].asset_called_with('/t/2.0')
 
-    def test_rollback(self):
+    def test_degrade(self):
         with multipatch('os.symlink', 'os.rename') as m:
             m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3']
-            m['os.path.exists'].return_value = True
-            m['os.path.isdir'].return_value = True
+            self._pass_current_checks(m)
             j = Jungle("/t")
-            rv = j.rollback()
+            rv = j.degrade()
             self.assertEqual(rv, '1.0')
             m['os.symlink'].assert_called_with('1.0', '/t/current.new')
             m['os.rename'].assert_called_with("/t/current.new", "/t/current")

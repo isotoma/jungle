@@ -17,6 +17,8 @@ import os
 import sys
 import optparse
 import shutil
+import stat
+import time
 
 from distutils.version import StrictVersion
 
@@ -45,7 +47,11 @@ class Jungle(object):
                 yield StrictVersion(item)
             except ValueError, e:
                 pass
-            
+        
+    def oldest(self):
+        """ Return the lowest version """
+        return sorted(self.versions())[0]
+    
     def exists(self, version):
         p = self.path(str(version))
         return os.path.isdir(p)
@@ -77,6 +83,7 @@ class Jungle(object):
         os.rename(self.path("current.new"), self.path("current"))
         
     def set(self, version):
+        self.check_current()
         if not isinstance(version, StrictVersion):
             version = StrictVersion(version)
         if not os.path.exists(self.path("current")):
@@ -86,21 +93,26 @@ class Jungle(object):
     def delete(self, version):
         """ Delete the specified version. Raises an error if the specified
         version is current. """
+        self.check_current()
         if not isinstance(version, StrictVersion):
             version = StrictVersion(version)
         if not self.exists(version):
             raise KeyError("Version %s does not exist" % version)
         if not os.path.exists(self.path("current")):
             raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+        if verbose:
+            print >>sys.stderr, "Deleting version %s" % (version,)
         shutil.rmtree(self.path(version))
 
     def latest(self):
         """ Set current to head """
+        self.check_current()
         self.set(self.head())
         
-    def rollback(self, dry_run=False):
+    def degrade(self, dry_run=False):
         """ Set current to head - 1 and returns the version chosen. If dry-run
         is True then just returns the version chosen. """
+        self.check_current()
         v = list(self.versions())
         if len(v) < 2:
             raise ValueError("Not enough versions to rollback")
@@ -108,20 +120,56 @@ class Jungle(object):
         if not dry_run:
             self.set(previous)
         return str(previous)
+    
+    def check_current(self):
+        """ Perform complete sanity checks on the status of current. Try to
+        rule out any of the mental states a jungle could get into if someone
+        tries to do stuff by hand. """
+        current = self.path("current")
+        if not os.path.exists(current):
+            raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+        if not os.path.islink(current):
+            raise OSError("Current %s is not a symlink, bailing" % current)
+        try:
+            version = StrictVersion(os.readlink(current))
+        except ValueError:
+            raise OSError("Current %s does not point to a valid version!" % current)
+        if not os.path.isdir(self.path(version)):
+            raise OSError("Current does not point to a valid directory!" % current)
+        return current
         
     def current(self):
-        """ Return the latest version """
+        """ Return the version that current points to """
+        current = self.check_current()
+        return os.readlink(current)
         
     def status(self):
         """ Prints "current" or "degraded" depending on state """
+        current = self.check_current()
+        if current == self.head():
+            return "current"
+        return "degraded"
+    
+    def age(self, version):
+        age = os.stat(self.path(v))[stat.ST_MTIME]
+        return age/(60*60*24)
         
     def prune_age(self, age):
         """ Delete versions older than age days. Will not delete the current
         version. """
+        self.check_current()
+        for v in self.versions():
+            days = self.age(v)
+            if days > age:
+                self.delete(v)
     
     def prune_iterations(self, n):
-        """ Delete the oldest n versions. Will not delete the current
-        version. """
+        """ Maintain a maximum of n versions. Will remove old versions until
+        there are n remaining """
+        self.check_current()
+        while len(list(self.versions())) > n:
+            self.delete(self.oldest())
+        
     
 class Cmd:
     
