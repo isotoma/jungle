@@ -6,7 +6,7 @@ import os
 import shutil
 import jungle
 import subprocess
-from jungle import Jungle, cmd, parse_command
+from jungle import Jungle, cmd, parse_command, JungleError
 from distutils.version import StrictVersion
 
 jungle.stderr = mock.MagicMock()
@@ -66,8 +66,8 @@ class CommandParseTest(TestCase):
 class JungleTest(TestCase):
     
     def test_init(self):
-        self.assertRaises(OSError, Jungle, "/t")
-        self.assertRaises(OSError, Jungle, "/etc/hosts")
+        self.assertRaises(JungleError, Jungle, "/t")
+        self.assertRaises(JungleError, Jungle, "/etc/hosts")
     
     def test_versions(self):
         ldrv = [['1.0', '2.0', 'bin', '1.3b1'],
@@ -105,7 +105,7 @@ class JungleTest(TestCase):
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
             self.assertEqual(j.head(), "2.0")
-            self.assertRaises(ValueError, j.head)
+            self.assertRaises(JungleError, j.head)
             
     def test_initialise_no_versions(self):
         with multipatch() as m:
@@ -113,7 +113,7 @@ class JungleTest(TestCase):
             m['os.path.exists'].return_value = True
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
-            self.assertRaises(SystemExit, j.initialise)
+            self.assertRaises(JungleError, j.initialise)
 
     def test_initialise_with_current(self):
         with multipatch() as m:
@@ -121,7 +121,7 @@ class JungleTest(TestCase):
             m['os.path.exists'].return_value = True
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
-            self.assertRaises(SystemExit, j.initialise)
+            self.assertRaises(JungleError, j.initialise)
 
     def _exists(self, *missing):
         def exists(v):
@@ -144,7 +144,7 @@ class JungleTest(TestCase):
             m['os.path.exists'].side_effect = self._exists("/t/current")
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
-            self.assertRaises(OSError, j.set, '1.0')
+            self.assertRaises(JungleError, j.set, '1.0')
 
     def _pass_current_checks(self, m):
         """ Set up the patches needed to pass the checks on current """
@@ -186,7 +186,7 @@ class JungleTest(TestCase):
         with multipatch('shutil.rmtree') as m:
             self._pass_current_checks(m)
             j = Jungle("/t")
-            self.assertRaises(OSError, j.delete, "1.0")
+            self.assertRaises(JungleError, j.delete, "1.0")
 
     def test_degrade(self):
         with multipatch('os.symlink', 'os.rename') as m:
@@ -304,7 +304,7 @@ class JungleTest(TestCase):
             m['os.readlink'].return_value = 'release/1.0b3'
             m['shutil.rmtree'].side_effect = fake_rmtree
             j = Jungle("/t")
-            self.assertRaises(OSError, j.prune_iterations, 3)
+            self.assertRaises(JungleError, j.prune_iterations, 3)
         
             
 class JungleSystemTest(TestCase):

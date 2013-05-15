@@ -25,13 +25,18 @@ from distutils.version import StrictVersion
 verbose = False
 stderr = sys.stderr
 
+
+class JungleError(Exception):
+    """ An error in the jungle itself. JungleErrors are handled within the
+    jungle invocation environment when run as a script. """
+
 class Jungle(object):
     
     def __init__(self, parent):
         if not os.path.exists(parent):
-            raise OSError("No such directory: %r" % parent)
+            raise JungleError("No such directory: %r" % parent)
         if not os.path.isdir(parent):
-            raise OSError("Is not a directory: %r" % parent)
+            raise JungleError("Is not a directory: %r" % parent)
         self.parent = parent # top level directory containing the jungle
         self.release = os.path.join(self.parent, "release")
         self.current = os.path.join(self.parent, "current")
@@ -55,7 +60,10 @@ class Jungle(object):
         return os.path.isdir(p)
             
     def head(self):
-        return max(self.versions())
+        v = list(self.versions())
+        if len(v) == 0:
+            raise JungleError("No versions present")
+        return max(v)
      
     def path(self, path):
         if isinstance(path, StrictVersion):
@@ -65,21 +73,18 @@ class Jungle(object):
     def initialise(self):
         """ Set up the appropriate current pointer """
         if os.path.exists(self.current):
-            print >>stderr, "Current already exists in %r, will not initialise existing jungle" % self.parent
-            raise SystemExit(-1)
+            raise JungleError("Current already exists in %r, will not initialise existing jungle" % self.parent)
         if not os.path.exists(self.release):
-            print >>stderr, "No release directory exists in %r" % self.parent
-            raise SystemExit(-1)
+            raise JungleError("No release directory exists in %r" % self.parent)
         try:
             head = self.head()
         except ValueError:
-            print >>stderr, "No versions in directory %r, cannot initialise" % self.release
-            raise SystemExit(-1)
+            raise JungleError("No versions in directory %r, cannot initialise" % self.release)
         self._set(self.head())
         
     def _set(self, version):
         if not self.exists(version):
-            raise KeyError("Version %s does not exist" % version)
+            raise JungleError("Version %s does not exist" % version)
         os.symlink("release/" + str(version), self.current_new)
         os.rename(self.current_new, self.current)
         
@@ -88,7 +93,7 @@ class Jungle(object):
         if not isinstance(version, StrictVersion):
             version = StrictVersion(version)
         if not os.path.exists(self.current):
-            raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+            raise JungleError("No current exists for %s - is this an initialised jungle?" % self.parent)
         self._set(version)
         return version
 
@@ -99,11 +104,11 @@ class Jungle(object):
         if not isinstance(version, StrictVersion):
             version = StrictVersion(version)
         if not self.exists(version):
-            raise KeyError("Version %s does not exist" % version)
+            raise JungleError("Version %s does not exist" % version)
         if not os.path.exists(self.current):
-            raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+            raise JungleError("No current exists for %s - is this an initialised jungle?" % self.parent)
         if version == self.current_version():
-            raise OSError("Will not delete current version")
+            raise JungleError("Will not delete current version")
         if verbose:
             print >>sys.stderr, "Deleting version %s" % (version,)
         shutil.rmtree(self.path(version))
@@ -119,7 +124,7 @@ class Jungle(object):
         self.check_current()
         v = list(self.versions())
         if len(v) < 2:
-            raise ValueError("Not enough versions to rollback")
+            raise JungleError("Not enough versions to rollback")
         previous = sorted(v)[-2]
         if not dry_run:
             self.set(previous)
@@ -131,18 +136,18 @@ class Jungle(object):
         tries to do stuff by hand. """
         current = self.current
         if not os.path.exists(current):
-            raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
+            raise JungleError("No current exists for %s - is this an initialised jungle?" % self.parent)
         if not os.path.islink(current):
-            raise OSError("Current %s is not a symlink, bailing" % current)
+            raise JungleError("Current %s is not a symlink, bailing" % current)
         ln = os.readlink(current)
         if not ln.startswith("release/"):
-            raise OSError("Current %s does not point to something in release!" % current)
+            raise JungleError("Current %s does not point to something in release!" % current)
         try:
             version = StrictVersion(ln[8:])
         except ValueError:
-            raise OSError("Current %s does not point to a valid version!" % current)
+            raise JungleError("Current %s does not point to a valid version!" % current)
         if not os.path.isdir(self.path(version)):
-            raise OSError("Current does not point to a valid directory!" % current)
+            raise JungleError("Current does not point to a valid directory!" % current)
         return version
 
     current_version = check_current
@@ -180,7 +185,7 @@ class Jungle(object):
         self.check_current()
         while len(list(self.versions())) > n:
             if self.oldest() == self.current_version():
-                raise OSError("I won't delete the current version, bailing.")
+                raise JungleError("I won't delete the current version, bailing.")
             self.delete(self.oldest())
         
     
@@ -195,8 +200,7 @@ class Cmd:
                 parent = args[0]
                 remaining = args[1:]
             else:
-                print >> stderr, "Wrong arguments"
-                raise SystemExit(-1)
+                raise JungleError("Wrong number of arguments passed")
         elif argc == 2:
             if len(args) == 0:
                 parent = os.getcwd()
@@ -208,8 +212,7 @@ class Cmd:
                 parent = args[0]
                 remaining = args[1:]
             else:
-                print >> stderr, "Wrong arguments"
-                raise SystemExit(-1)
+                raise JungleError("Wrong number of arguments passed")
         return parent, remaining
             
     def help_init(self):
@@ -312,8 +315,7 @@ class Cmd:
     
     def do_prune(self, opts, args):
         if (opts.age is None) == (opts.iterations is None):
-            print >>sys.stderr, "One and only one of age or iterations must be chosen"
-            raise SystemExit(-1)
+            raise JungleError("One and only one of age or iterations must be chosen")
         parent, _ = self._parent(args)
         j = Jungle(parent)
         if opts.age is not None:
@@ -343,9 +345,7 @@ class Cmd:
             if helpfunc is not None:
                 helpfunc()
             else:
-                print "Command %s not known" % args[0]
-                raise SystemExit(-1)
-        raise SystemExit(0)
+                raise JungleError("Command %s not known" % args[0])
 
 cmd = Cmd()
 
@@ -383,6 +383,6 @@ if __name__ == '__main__':
     func, opts, args = parse_command(sys.argv[1:])
     try:
         func(opts, args)
-    except OSError, e:
+    except JungleError, e:
         print str(e)
         raise SystemExit(-1)
