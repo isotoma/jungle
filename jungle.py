@@ -181,41 +181,73 @@ class Jungle(object):
     
 class Cmd:
     
-    def do_init(self, opts, args):
+    def _parent(self, args, argc=1):
         if len(args) == 0:
-            tld = os.getcwd()
+            parent = os.getcwd()
+            remaining = args
         elif len(args) == 1:
-            tld = args[0]
-        else:
-            print >>stderr, "Too many arguments to init"
+            parent = args[0]
+            remaining = args[1:]
+        if len(args) != argc:
+            print >>stderr, "Too many arguments"
             raise SystemExit(-1)
-        if not os.path.isdir(tld):
-            print >>stderr, "Jungle directory %r does not exist" % tld
-            raise SystemExit(-1)
-        print "Initialising jungle in", tld
-        j = Jungle(tld)
+        return parent, remaining
+            
+    def do_init(self, opts, args):
+        parent, _ = self._parent(args)
+        print "Initialising jungle in", parent
+        j = Jungle(parent)
         j.initialise()
         
     def do_set(self, opts, args):
-        pass
+        parent, r = self._parent(args, argc=2)
+        j = Jungle(parent)
+        version = r[0]
+        j.set(version)
 
     def do_upgrade(self, opts, args):
-        pass
-    
+        parent, _ = self._parent(args)
+        j = Jungle(parent)
+        j.upgrade()
+
+    def opts_degrade(self, p):
+        p.add_option("--dry-run", default=False, action="store_true", help="don't make any changes")
+        
     def do_degrade(self, opts, args):
-        pass
+        parent, _ = self._parent(args)
+        j = Jungle(parent)
+        j.degrade(dry_run=opts.dry_run)
     
     def do_current(self, opts, args):
-        pass
+        parent, _ = self._parent(args)
+        j = Jungle(parent)
+        j.current()
     
     def do_status(self, opts, args):
-        pass
+        parent, _ = self._parent(args)
+        j = Jungle(parent)
+        j.status()
+        
+    def opts_prune(self, p):
+        p.add_option("--age", default=None, action="store_int", help="age in days to preserve")
+        p.add_option("--iterations", default=None, action="store_int", help="iterations to preserve")
     
     def do_prune(self, opts, args):
-        pass
+        if (opts.age is None) == (opts.iterations is None):
+            print >>sys.stderr, "One and only one of age or iterations must be chosen"
+            raise SystemExit(-1)
+        parent, _ = self._parent(args)
+        j = Jungle(parent)
+        if opts.age is not None:
+            j.prune_age(opts.age)
+        if opts.iterations is not None:
+            j.prune_iterations(opts.iterations)
     
     def do_delete(self, opts, args):
-        pass
+        parent, r = self._parent(args, argc=2)
+        j = Jungle(parent)
+        version = r[0]
+        j.delete(version)
     
     def do_help(self, opts, args):
         print "Help!"

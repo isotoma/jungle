@@ -288,9 +288,6 @@ class JungleTest(TestCase):
             m['shutil.rmtree'].assert_any_call_with('/t/1.0b3')
             m['shutil.rmtree'].assert_any_call_with('/t/1.0')
             
-        
-            
-            
 if __name__ == '__main__':
     main()
                          
