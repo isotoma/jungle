@@ -22,11 +22,6 @@ import time
 
 from distutils.version import StrictVersion
 
-try:
-    import wingdbstub
-except ImportError:
-    pass
-
 verbose = False
 stderr = sys.stderr
 
@@ -182,21 +177,37 @@ class Jungle(object):
         there are n remaining """
         self.check_current()
         while len(list(self.versions())) > n:
+            if self.oldest() == self.current_version():
+                raise OSError("I won't delete the current version, bailing.")
             self.delete(self.oldest())
         
     
 class Cmd:
     
     def _parent(self, args, argc=1):
-        if len(args) == 0:
-            parent = os.getcwd()
-            remaining = args
-        elif len(args) == 1:
-            parent = args[0]
-            remaining = args[1:]
-        if len(args) > argc:
-            print >>stderr, "Too many arguments"
-            raise SystemExit(-1)
+        if argc == 1:
+            if len(args) == 0:
+                parent = os.getcwd()
+                remaining = args
+            elif len(args) == 1:
+                parent = args[0]
+                remaining = args[1:]
+            else:
+                print >> stderr, "Wrong arguments"
+                raise SystemExit(-1)
+        elif argc == 2:
+            if len(args) == 0:
+                parent = os.getcwd()
+                remaining = args
+            elif len(args) == 1:
+                parent = os.getcwd()
+                remaining = args
+            elif len(args) == 2:
+                parent = args[0]
+                remaining = args[1:]
+            else:
+                print >> stderr, "Wrong arguments"
+                raise SystemExit(-1)
         return parent, remaining
             
     def do_init(self, opts, args):
@@ -236,7 +247,7 @@ class Cmd:
     def do_current(self, opts, args):
         parent, _ = self._parent(args)
         j = Jungle(parent)
-        j.current()
+        print j.current_version()
     
     def do_status(self, opts, args):
         parent, _ = self._parent(args)
@@ -244,8 +255,8 @@ class Cmd:
         print j.status()
         
     def opts_prune(self, p):
-        p.add_option("--age", default=None, action="store_int", help="age in days to preserve")
-        p.add_option("--iterations", default=None, action="store_int", help="iterations to preserve")
+        p.add_option("--age", default=None, action="store", type="int", help="age in days to preserve")
+        p.add_option("--iterations", default=None, action="store", type="int", help="iterations to preserve")
     
     def do_prune(self, opts, args):
         if (opts.age is None) == (opts.iterations is None):
@@ -307,6 +318,8 @@ def parse_command(args):
     return func, opts, args
 
 if __name__ == '__main__':
+    import wingdbstub
+
     func, opts, args = parse_command(sys.argv[1:])
     try:
         func(opts, args)

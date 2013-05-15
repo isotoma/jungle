@@ -1,9 +1,7 @@
 
-import wingdbstub
-
 from unittest import TestCase, main
 import mock
-
+import time
 import os
 import shutil
 import jungle
@@ -290,6 +288,19 @@ class JungleTest(TestCase):
             m['shutil.rmtree'].assert_any_call_with('/t/release/1.0b3')
             m['shutil.rmtree'].assert_any_call_with('/t/release/1.0')
             
+    def test_prune_iterations_keep_current(self):
+        versions = ['1.0', '2.0', '1.0b3', '1.1', '1.5']
+        def fake_rmtree(pathname):
+            versions.remove(os.path.basename(pathname))
+        with multipatch() as m:
+            self._pass_current_checks(m)
+            m['os.listdir'].side_effect = lambda x: versions
+            m['os.readlink'].return_value = 'release/1.0b3'
+            m['shutil.rmtree'].side_effect = fake_rmtree
+            j = Jungle("/t")
+            self.assertRaises(OSError, j.prune_iterations, 3)
+        
+            
 class JungleSystemTest(TestCase):
 
     """ Exercise jungle for real. This will do things with a directory called "j"
@@ -303,15 +314,93 @@ class JungleSystemTest(TestCase):
         self.jungle("init")
         
     def tearDown(self):
+        """ tear down and delete j """
         shutil.rmtree("j")
         
     def jungle(self, command, *a):
         args = ["./jungle.py", command, "j"]
         args.extend(a)
         return subprocess.check_output(args)
+
+    def jungle2(self, command, opts=(), a=()):
+        args = ["./jungle.py", command]
+        args.extend(opts)
+        args.append("j")
+        args.extend(a)
+        return subprocess.check_output(args)
+    
+    def test_init(self):
+        self.assertEqual(os.readlink("j/current"), "release/1.0")
+        
+    def test_set(self):
+        os.mkdir("j/release/2.0")
+        self.jungle("set", "2.0")
+        self.assertEqual(os.readlink("j/current"), "release/2.0")
+        self.jungle("set", "1.0")
+        self.assertEqual(os.readlink("j/current"), "release/1.0")
+        
+    def test_upgrade(self):
+        os.mkdir("j/release/2.0")
+        os.mkdir("j/release/3.0")
+        self.jungle("upgrade")
+        self.assertEqual(os.readlink("j/current"), "release/3.0")
+
+    def test_degrade(self):
+        os.mkdir("j/release/0.5")
+        self.jungle("degrade")
+        self.assertEqual(os.readlink("j/current"), "release/0.5")
+        
+    def test_current(self):
+        self.assertEqual(self.jungle("current"), "1.0\n")
         
     def test_status(self):
         self.assertEqual(self.jungle("status"), "current\n")
+        os.mkdir("j/release/2.0")
+        self.assertEqual(self.jungle("status"), "degraded\n")
+        
+    def test_prune_age_preserve_current(self):
+        os.mkdir("j/release/2.0")
+        os.mkdir("j/release/3.0")
+        os.mkdir("j/release/4.0")
+        now = time.time()
+        os.utime("j/release/1.0", (now, now - 10*24*3600))
+        os.utime("j/release/2.0", (now, now - 8*24*3600))
+        os.utime("j/release/3.0", (now, now - 5*24*3600))
+        self.jungle2("prune", opts=["--age", "5"])
+        self.assert_(os.path.exists("j/release/1.0"))
+        self.assert_(not os.path.exists("j/release/2.0"))
+        self.assert_(os.path.exists("j/release/3.0"))
+        self.assert_(os.path.exists("j/release/4.0"))
+    
+    def test_prune_age(self):
+        os.mkdir("j/release/2.0")
+        os.mkdir("j/release/3.0")
+        os.mkdir("j/release/4.0")
+        now = time.time()
+        os.utime("j/release/1.0", (now, now - 10*24*3600))
+        os.utime("j/release/2.0", (now, now - 8*24*3600))
+        os.utime("j/release/3.0", (now, now - 5*24*3600))
+        self.jungle("upgrade")
+        self.jungle2("prune", opts=["--age", "5"])
+        self.assert_(not os.path.exists("j/release/1.0"))
+        self.assert_(not os.path.exists("j/release/2.0"))
+        self.assert_(os.path.exists("j/release/3.0"))
+        self.assert_(os.path.exists("j/release/4.0"))
+        
+    def test_prune_iterations_preserve_current(self):
+        os.mkdir("j/release/2.0")
+        os.mkdir("j/release/3.0")
+        os.mkdir("j/release/4.0")
+        self.jungle("upgrade")
+        self.jungle2("prune", opts=["--iterations", "2"])
+        self.assert_(not os.path.exists("j/release/1.0"))
+        self.assert_(not os.path.exists("j/release/2.0"))
+        self.assert_(os.path.exists("j/release/3.0"))
+        self.assert_(os.path.exists("j/release/4.0"))
+        
+    
+    
+        
 
     
     
