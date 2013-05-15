@@ -7,8 +7,11 @@ Maintain a symlink farm for fast software rollbacks.
 Terminology
 ===========
 
+  Release Directory
+    The directory containing the version directories.
+    
   Parent
-    The directory containing the version directories. It may also contain other directories, but these should not be valid StrictVersion version numbers.
+    The directory containing the release directory.
     
   Head
     The most recent version present in the parent.
@@ -28,45 +31,25 @@ Terminology
 Directory structure
 ===================
 
-The directory structure it maintains looks like::
+The directory structure jungle maintains looks like::
 
-    1.0/
-    2.0/
-    3.0/
-    current -> 1.0/
+    parent/
+        releases/1.0/
+            1.1/
+            2.0/
+            2.2/
+            3.0/
+        current -> releases/3.0
     
-Other directories
------------------
-
-There may be other directories inside the parent directory, for example for a python project you might have::
-
-    1.0/
-    1.1/
-    2.0/
-    2.2/
-    3.0/
-    current -> 3.0
-    bin -> current/bin
-    var/
-    eggs/
+You are expected to have other files in this parent directory, for example:
     
-As long as the other directories are NOT valid versions according to
-`StrictVersion` (see below) then this will work.
+    parent/
+        bin -> current/bin
+        current -> releases/3.0
+        eggs/
+        releases/
+        var/
 
-Alternatively you could maintain your versions in a separate directory::
-
-    versions/1.0/
-             1.1/
-             2.0/
-             2.2/
-             3.0/
-             current -> 3.0
-    bin -> versions/current/bin
-    var/
-    eggs/
-
-In this case the `parent` would include the `version` path component.
-    
 Version numbers
 ===============
 

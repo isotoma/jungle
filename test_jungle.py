@@ -5,7 +5,9 @@ from unittest import TestCase, main
 import mock
 
 import os
+import shutil
 import jungle
+import subprocess
 from jungle import Jungle, cmd, parse_command
 from distutils.version import StrictVersion
 
@@ -66,7 +68,7 @@ class CommandParseTest(TestCase):
 class JungleTest(TestCase):
     
     def test_init(self):
-        self.assertRaises(OSError, Jungle, "/foo")
+        self.assertRaises(OSError, Jungle, "/t")
         self.assertRaises(OSError, Jungle, "/etc/hosts")
     
     def test_versions(self):
@@ -135,7 +137,7 @@ class JungleTest(TestCase):
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
             j.initialise()
-            m['os.symlink'].assert_called_with('1.0', '/t/current.new')
+            m['os.symlink'].assert_called_with('release/1.0', '/t/current.new')
             m['os.rename'].assert_called_with("/t/current.new", "/t/current")
             
     def test_set_no_current(self):
@@ -151,7 +153,7 @@ class JungleTest(TestCase):
         m['os.path.exists'].return_value = True
         m['os.path.islink'].return_value = True
         m['os.path.isdir'].return_value = True
-        m['os.readlink'].return_value = '1.0'
+        m['os.readlink'].return_value = 'release/1.0'
         
     def test_check_current(self):
         with multipatch() as m:
@@ -166,13 +168,13 @@ class JungleTest(TestCase):
             m['os.path.exists'].side_effect = self._exists("/t/current")
             j = Jungle("/t")
             j.initialise()
-            m['os.symlink'].assert_called_with('1.0', '/t/current.new')
+            m['os.symlink'].assert_called_with('release/1.0', '/t/current.new')
             m['os.rename'].assert_called_with("/t/current.new", "/t/current")
             # now set it to 2.0
             m['os.listdir'].return_value = ['1.0', '2.0']
             m['os.path.exists'].side_effect = self._exists()
             j.set('2.0')
-            m['os.symlink'].assert_called_with('2.0', '/t/current.new')
+            m['os.symlink'].assert_called_with('release/2.0', '/t/current.new')
             m['os.rename'].assert_called_with("/t/current.new", "/t/current")
             
     def test_delete(self):
@@ -180,7 +182,7 @@ class JungleTest(TestCase):
             self._pass_current_checks(m)
             j = Jungle("/t")
             j.delete("2.0")
-            m['shutil.rmtree'].asset_called_with('/t/2.0')
+            m['shutil.rmtree'].asset_called_with('/t/release/2.0')
 
     def test_degrade(self):
         with multipatch('os.symlink', 'os.rename') as m:
@@ -189,32 +191,32 @@ class JungleTest(TestCase):
             j = Jungle("/t")
             rv = j.degrade()
             self.assertEqual(rv, '1.0')
-            m['os.symlink'].assert_called_with('1.0', '/t/current.new')
+            m['os.symlink'].assert_called_with('release/1.0', '/t/current.new')
             
-    def test_latest(self):
+    def test_upgrade(self):
         with multipatch('os.symlink', 'os.rename') as m:
             m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3']
             self._pass_current_checks(m)
             j = Jungle("/t")
-            v = j.latest()
+            v = j.upgrade()
             self.assertEqual(v, '2.0')
-            m['os.symlink'].assert_called_with('2.0', '/t/current.new')
+            m['os.symlink'].assert_called_with('release/2.0', '/t/current.new')
             
-    def test_current(self):
+    def test_current_version(self):
         with multipatch() as m:
             self._pass_current_checks(m)
-            m['os.readlink'].return_value = '2.0'
+            m['os.readlink'].return_value = 'release/2.0'
             j = Jungle("/t")
-            self.assertEqual(j.current(), '2.0')
+            self.assertEqual(j.current_version(), '2.0')
             
     def test_status(self):
         with multipatch() as m:
             self._pass_current_checks(m)
             m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3']
-            m['os.readlink'].return_value = '2.0'
+            m['os.readlink'].return_value = 'release/2.0'
             j = Jungle("/t")
             self.assertEqual(j.status(), 'current')
-            m['os.readlink'].return_value = '1.0'
+            m['os.readlink'].return_value = 'release/1.0'
             self.assertEqual(j.status(), 'degraded')
         
     def test_age(self):
@@ -235,10 +237,10 @@ class JungleTest(TestCase):
     
     def test_prune_age(self):
         ages = {
-            '/t/1.0': 10,
-            '/t/1.0b3': 9,
-            '/t/1.2': 5,
-            '/t/2.0': 3
+            '/t/release/1.0': 10,
+            '/t/release/1.0b3': 9,
+            '/t/release/1.2': 5,
+            '/t/release/2.0': 3
         }
         def fake_stat(pathname):
             l = [None]*9
@@ -250,28 +252,28 @@ class JungleTest(TestCase):
             m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3', '1.2']
             m['time.time'].return_value = 10*24*3600
             m['os.stat'].side_effect = fake_stat
-            m['os.readlink'].return_value = '2.0'
+            m['os.readlink'].return_value = 'release/2.0'
             
         with multipatch('shutil.rmtree') as m:
             setup()
             j = Jungle("/t")
             j.prune_age(9)
-            m['shutil.rmtree'].assert_called_with('/t/1.0')
+            m['shutil.rmtree'].assert_called_with('/t/release/1.0')
 
         with multipatch('shutil.rmtree') as m:
             setup()
             j = Jungle("/t")
             j.prune_age(5)
-            m['shutil.rmtree'].assert_any_call_with('/t/1.0b3')
-            m['shutil.rmtree'].assert_any_call_with('/t/1.0')
+            m['shutil.rmtree'].assert_any_call_with('/t/release/1.0b3')
+            m['shutil.rmtree'].assert_any_call_with('/t/release/1.0')
 
         with multipatch('shutil.rmtree') as m:
             setup()
             j = Jungle("/t")
             j.prune_age(0)
-            m['shutil.rmtree'].assert_any_call_with('/t/1.0b3')
-            m['shutil.rmtree'].assert_any_call_with('/t/1.0')
-            m['shutil.rmtree'].assert_any_call_with('/t/1.2')
+            m['shutil.rmtree'].assert_any_call_with('/t/release/1.0b3')
+            m['shutil.rmtree'].assert_any_call_with('/t/release/1.0')
+            m['shutil.rmtree'].assert_any_call_with('/t/release/1.2')
         
     def test_prune_iterations(self):
         versions = ['1.0', '2.0', '1.0b3', '1.1', '1.5']
@@ -280,14 +282,39 @@ class JungleTest(TestCase):
         with multipatch() as m:
             self._pass_current_checks(m)
             m['os.listdir'].side_effect = lambda x: versions
-            m['os.readlink'].return_value = '2.0'
+            m['os.readlink'].return_value = 'release/2.0'
             m['shutil.rmtree'].side_effect = fake_rmtree
             j = Jungle("/t")
             j.prune_iterations(3)
             self.assertEqual(m['shutil.rmtree'].call_count, 2)
-            m['shutil.rmtree'].assert_any_call_with('/t/1.0b3')
-            m['shutil.rmtree'].assert_any_call_with('/t/1.0')
+            m['shutil.rmtree'].assert_any_call_with('/t/release/1.0b3')
+            m['shutil.rmtree'].assert_any_call_with('/t/release/1.0')
             
+class JungleSystemTest(TestCase):
+
+    """ Exercise jungle for real. This will do things with a directory called "j"
+    in your current working directory. """
+    
+    def setUp(self):
+        assert not os.path.exists("j")
+        os.mkdir("j")
+        os.mkdir("j/release")
+        os.mkdir("j/release/1.0")
+        self.jungle("init")
+        
+    def tearDown(self):
+        shutil.rmtree("j")
+        
+    def jungle(self, command, *a):
+        args = ["./jungle.py", command, "j"]
+        args.extend(a)
+        return subprocess.check_output(args)
+        
+    def test_status(self):
+        self.assertEqual(self.jungle("status"), "current\n")
+
+    
+    
 if __name__ == '__main__':
     main()
                          

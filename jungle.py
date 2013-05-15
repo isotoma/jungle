@@ -38,11 +38,14 @@ class Jungle(object):
         if not os.path.isdir(parent):
             raise OSError("Is not a directory: %r" % parent)
         self.parent = parent # top level directory containing the jungle
+        self.release = os.path.join(self.parent, "release")
+        self.current = os.path.join(self.parent, "current")
+        self.current_new = os.path.join(self.parent, "current.new")
         
     def versions(self):
         """ Return StrictVersion objects for every possible version. If
         something is not a valid version number we ignore it. """
-        for item in sorted(os.listdir(self.parent)):
+        for item in sorted(os.listdir(self.release)):
             try:
                 yield StrictVersion(item)
             except ValueError, e:
@@ -62,31 +65,34 @@ class Jungle(object):
     def path(self, path):
         if isinstance(path, StrictVersion):
             path = str(path)
-        return os.path.join(self.parent, path)
+        return os.path.join(self.release, path)
                 
     def initialise(self):
         """ Set up the appropriate current pointer """
+        if os.path.exists(self.current):
+            print >>stderr, "Current already exists in %r, will not initialise existing jungle" % self.parent
+            raise SystemExit(-1)
+        if not os.path.exists(self.release):
+            print >>stderr, "No release directory exists in %r" % self.parent
+            raise SystemExit(-1)
         try:
             head = self.head()
         except ValueError:
-            print >>stderr, "No versions in directory %r, cannot initialise" % self.parent
-            raise SystemExit(-1)
-        if os.path.exists(self.path("current")):
-            print >>stderr, "Current already exists in %r, will not initialise existing jungle" % self.parent
+            print >>stderr, "No versions in directory %r, cannot initialise" % self.release
             raise SystemExit(-1)
         self._set(self.head())
         
     def _set(self, version):
         if not self.exists(version):
             raise KeyError("Version %s does not exist" % version)
-        os.symlink(str(version), self.path("current.new"))
-        os.rename(self.path("current.new"), self.path("current"))
+        os.symlink("release/" + str(version), self.current_new)
+        os.rename(self.current_new, self.current)
         
     def set(self, version):
         self.check_current()
         if not isinstance(version, StrictVersion):
             version = StrictVersion(version)
-        if not os.path.exists(self.path("current")):
+        if not os.path.exists(self.current):
             raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
         self._set(version)
         return version
@@ -99,17 +105,17 @@ class Jungle(object):
             version = StrictVersion(version)
         if not self.exists(version):
             raise KeyError("Version %s does not exist" % version)
-        if not os.path.exists(self.path("current")):
+        if not os.path.exists(self.current):
             raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
         if verbose:
             print >>sys.stderr, "Deleting version %s" % (version,)
         shutil.rmtree(self.path(version))
 
-    def latest(self):
+    def upgrade(self):
         """ Set current to head """
         self.check_current()
         return self.set(self.head())
-        
+    
     def degrade(self, dry_run=False):
         """ Set current to head - 1 and returns the version chosen. If dry-run
         is True then just returns the version chosen. """
@@ -126,24 +132,24 @@ class Jungle(object):
         """ Perform complete sanity checks on the status of current. Try to
         rule out any of the mental states a jungle could get into if someone
         tries to do stuff by hand. """
-        current = self.path("current")
+        current = self.current
         if not os.path.exists(current):
             raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
         if not os.path.islink(current):
             raise OSError("Current %s is not a symlink, bailing" % current)
+        ln = os.readlink(current)
+        if not ln.startswith("release/"):
+            raise OSError("Current %s does not point to something in release!" % current)
         try:
-            version = StrictVersion(os.readlink(current))
+            version = StrictVersion(ln[8:])
         except ValueError:
             raise OSError("Current %s does not point to a valid version!" % current)
         if not os.path.isdir(self.path(version)):
             raise OSError("Current does not point to a valid directory!" % current)
         return version
-        
-    def current(self):
-        """ Return the version that current points to """
-        current = self.check_current()
-        return os.readlink(current)
-        
+
+    current_version = check_current
+    
     def status(self):
         """ Prints "current" or "degraded" depending on state """
         current = self.check_current()
@@ -163,7 +169,7 @@ class Jungle(object):
         version. """
         self.check_current()
         for v in self.versions():
-            if v == self.current():
+            if v == self.current_version():
                 if verbose:
                     print "Skipping current"
             else:
@@ -188,7 +194,7 @@ class Cmd:
         elif len(args) == 1:
             parent = args[0]
             remaining = args[1:]
-        if len(args) != argc:
+        if len(args) > argc:
             print >>stderr, "Too many arguments"
             raise SystemExit(-1)
         return parent, remaining
@@ -198,6 +204,15 @@ class Cmd:
         print "Initialising jungle in", parent
         j = Jungle(parent)
         j.initialise()
+        
+    def help_init(self):
+        print
+        print "Initialise a new jungle. This will return an error if run on an existing"
+        print "jungle, or if there are no software versions present"
+        print
+        print "Usage:"
+        print
+        print "    jungle init [<pathname>]"
         
     def do_set(self, opts, args):
         parent, r = self._parent(args, argc=2)
@@ -226,7 +241,7 @@ class Cmd:
     def do_status(self, opts, args):
         parent, _ = self._parent(args)
         j = Jungle(parent)
-        j.status()
+        print j.status()
         
     def opts_prune(self, p):
         p.add_option("--age", default=None, action="store_int", help="age in days to preserve")
@@ -250,7 +265,15 @@ class Cmd:
         j.delete(version)
     
     def do_help(self, opts, args):
-        print "Help!"
+        if len(args) == 0:
+            print "Help!"
+        elif len(args) == 1:
+            helpfunc = getattr(self, "help_" + args[0], None)
+            if helpfunc is not None:
+                helpfunc()
+            else:
+                print "Command %s not known" % args[0]
+                raise SystemExit(-1)
         raise SystemExit(0)
 
 cmd = Cmd()
@@ -285,5 +308,8 @@ def parse_command(args):
 
 if __name__ == '__main__':
     func, opts, args = parse_command(sys.argv[1:])
-    func(opts, args)
-    
+    try:
+        func(opts, args)
+    except OSError, e:
+        print str(e)
+        raise SystemExit(-1)
