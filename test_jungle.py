@@ -95,9 +95,7 @@ class JungleTest(TestCase):
             m['os.path.isdir'].return_value = True
             j = Jungle("/t")
             self.assertEqual(j.oldest(), '1.0')
-            
-        
-    
+
     def test_head(self):
         ldrv = [['1.0', '2.0', 'bin', '1.3b1'],
                 ['bin']]
@@ -192,7 +190,50 @@ class JungleTest(TestCase):
             rv = j.degrade()
             self.assertEqual(rv, '1.0')
             m['os.symlink'].assert_called_with('1.0', '/t/current.new')
-            m['os.rename'].assert_called_with("/t/current.new", "/t/current")
+            
+    def test_latest(self):
+        with multipatch('os.symlink', 'os.rename') as m:
+            m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3']
+            self._pass_current_checks(m)
+            j = Jungle("/t")
+            v = j.latest()
+            self.assertEqual(v, '2.0')
+            m['os.symlink'].assert_called_with('2.0', '/t/current.new')
+            
+    def test_current(self):
+        with multipatch() as m:
+            self._pass_current_checks(m)
+            m['os.readlink'].return_value = '2.0'
+            j = Jungle("/t")
+            self.assertEqual(j.current(), '2.0')
+            
+    def test_status(self):
+        with multipatch() as m:
+            self._pass_current_checks(m)
+            m['os.listdir'].return_value = ['1.0', '2.0', '1.0b3']
+            m['os.readlink'].return_value = '2.0'
+            j = Jungle("/t")
+            self.assertEqual(j.status(), 'current')
+            m['os.readlink'].return_value = '1.0'
+            self.assertEqual(j.status(), 'degraded')
+        
+    def test_age(self):
+        def fake_stat(t):
+            l = [None]*9
+            l[8] = t
+            return l
+        with multipatch() as m:
+            self._pass_current_checks(m)
+            m['time.time'].return_value = 10*24*3600
+            m['os.stat'].return_value = fake_stat(0)
+            j = Jungle("/t")
+            self.assertEqual(j.age("foo"), 10)
+            m['os.stat'].return_value = fake_stat(9*24*3600)
+            self.assertEqual(j.age("foo"), 1)
+            m['os.stat'].return_value = fake_stat(9*24*3600+1800)
+            self.assertEqual(j.age("foo"), 0)
+        
+            
             
 if __name__ == '__main__':
     main()

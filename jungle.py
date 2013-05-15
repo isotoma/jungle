@@ -89,6 +89,7 @@ class Jungle(object):
         if not os.path.exists(self.path("current")):
             raise OSError("No current exists for %s - is this an initialised jungle?" % self.parent)
         self._set(version)
+        return version
 
     def delete(self, version):
         """ Delete the specified version. Raises an error if the specified
@@ -107,7 +108,7 @@ class Jungle(object):
     def latest(self):
         """ Set current to head """
         self.check_current()
-        self.set(self.head())
+        return self.set(self.head())
         
     def degrade(self, dry_run=False):
         """ Set current to head - 1 and returns the version chosen. If dry-run
@@ -136,7 +137,7 @@ class Jungle(object):
             raise OSError("Current %s does not point to a valid version!" % current)
         if not os.path.isdir(self.path(version)):
             raise OSError("Current does not point to a valid directory!" % current)
-        return current
+        return version
         
     def current(self):
         """ Return the version that current points to """
@@ -151,7 +152,9 @@ class Jungle(object):
         return "degraded"
     
     def age(self, version):
-        age = os.stat(self.path(v))[stat.ST_MTIME]
+        ftime = os.stat(self.path(version))[stat.ST_MTIME]
+        now = time.time()
+        age = now-ftime
         return age/(60*60*24)
         
     def prune_age(self, age):
