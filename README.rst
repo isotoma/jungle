@@ -30,40 +30,40 @@ Directory structure
 
 The directory structure it maintains looks like::
 
-    1.0
-    2.0
-    3.0
-    current -> 1.0
+    1.0/
+    2.0/
+    3.0/
+    current -> 1.0/
     
 Other directories
 -----------------
 
 There may be other directories inside the parent directory, for example for a python project you might have::
 
-    1.0
-    1.1
-    2.0
-    2.2
-    3.0
+    1.0/
+    1.1/
+    2.0/
+    2.2/
+    3.0/
     current -> 3.0
     bin -> current/bin
-    var
-    eggs
+    var/
+    eggs/
     
 As long as the other directories are NOT valid versions according to
 `StrictVersion` (see below) then this will work.
 
 Alternatively you could maintain your versions in a separate directory::
 
-    versions/1.0
-             1.1
-             2.0
-             2.2
-             3.0
+    versions/1.0/
+             1.1/
+             2.0/
+             2.2/
+             3.0/
              current -> 3.0
     bin -> versions/current/bin
-    var
-    eggs
+    var/
+    eggs/
 
 In this case the `parent` would include the `version` path component.
     
