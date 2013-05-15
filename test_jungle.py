@@ -273,6 +273,22 @@ class JungleTest(TestCase):
             m['shutil.rmtree'].assert_any_call_with('/t/1.0')
             m['shutil.rmtree'].assert_any_call_with('/t/1.2')
         
+    def test_prune_iterations(self):
+        versions = ['1.0', '2.0', '1.0b3', '1.1', '1.5']
+        def fake_rmtree(pathname):
+            versions.remove(os.path.basename(pathname))
+        with multipatch() as m:
+            self._pass_current_checks(m)
+            m['os.listdir'].side_effect = lambda x: versions
+            m['os.readlink'].return_value = '2.0'
+            m['shutil.rmtree'].side_effect = fake_rmtree
+            j = Jungle("/t")
+            j.prune_iterations(3)
+            self.assertEqual(m['shutil.rmtree'].call_count, 2)
+            m['shutil.rmtree'].assert_any_call_with('/t/1.0b3')
+            m['shutil.rmtree'].assert_any_call_with('/t/1.0')
+            
+        
             
             
 if __name__ == '__main__':
